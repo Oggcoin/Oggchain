@@ -1,0 +1,22 @@
+{
+  "config": {
+    "chainId": 19870,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "progpow": {
+      "period": 10
+    }
+  },
+  "nonce": "0x0000000000000042",
+  "timestamp": "0x0",
+  "extraData": "0x",
+  "gasLimit": "0x1000000",
+  "difficulty": "0x10000000",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "alloc": {}
+}
