@@ -80,13 +80,8 @@ const (
 )
 
 var (
-	DifficultyBoundDivisor = big.NewInt(2048)   // The bound divisor of the difficulty, used in the update calculations.
-	GenesisDifficulty      = big.NewInt(1024) // Difficulty of the Genesis block. Lowered for local testing; restore EGEMMainnetMinDifficulty for production.
-	MinimumDifficulty      = big.NewInt(1024) // The minimum that the difficulty may ever be. Lowered for local testing; restore EGEMMainnetMinDifficulty for production.
-	DurationLimit          = big.NewInt(17)     // The decision boundary on the blocktime duration used to determine whether difficulty should go up or not.
-
-	// EGEMMainnetMinDifficulty is the original EGEM mainnet minimum difficulty.
-	// Restore GenesisDifficulty and MinimumDifficulty to this value before mainnet
-	// deployment (only after real DAG integration is complete).
-	EGEMMainnetMinDifficulty = big.NewInt(113635671)
+	DifficultyBoundDivisor = big.NewInt(2048)    // The bound divisor of the difficulty, used in the update calculations.
+	GenesisDifficulty      = big.NewInt(83886080) // OGG: 0x5000000 — good start for 1-5 GPUs, adjusts to 12s target quickly.
+	MinimumDifficulty      = big.NewInt(100000)  // OGG: never collapses below this — chain always keeps moving.
+	DurationLimit          = big.NewInt(17)      // Decision boundary on blocktime duration for difficulty adjustment.
 )

@@ -188,7 +188,8 @@ func (p *ProgPoW) Prepare(chain consensus.ChainReader, header *types.Header) err
 }
 
 func (p *ProgPoW) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
-	accumulateRewards(chain.Config(), state, header, uncles)
+	// OGG: use our 4-way split reward function
+	accumulateRewardsOGG(chain.Config(), state, header, uncles)
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	return types.NewBlock(header, txs, uncles, receipts), nil
 }
@@ -475,26 +476,84 @@ func (p *ProgPoW) mine(block *types.Block, startNonce uint64, abort chan struct{
 // Block rewards (ProgPoW chain — 5 EGEM base; adjust in genesis config)
 // ----------------------------------------------------------------------------
 
+// OGG Chain — Reward Variables
+// S3 Enhanced emission: 700 OGG start, decay 0.999999933042/block
+// Split: 45% miner, 40% staking, 7% tribe pool, 8% maintenance
 var (
-	big8  = big.NewInt(8)
-	big32 = big.NewInt(32)
-	// progpowBlockReward is 5 EGEM per block.
-	progpowBlockReward = new(big.Int).Mul(big.NewInt(5), big.NewInt(1e18))
+	// Initial block reward: 700 OGG in wei (700 * 10^18)
+	oggInitialReward, _   = new(big.Int).SetString("700000000000000000000", 10)
+
+	// Decay factor: 0.999999933042 = 999999933042 / 1000000000000
+	// Integer arithmetic only — no floats in consensus code
+	oggDecayNumerator     = big.NewInt(999999933042)
+	oggDecayDenominator   = big.NewInt(1000000000000)
+
+	// OGG reward split addresses — hardcoded at chain launch, never change
+	// Miner (45%) goes to header.Coinbase — dynamic, whoever mined the block
+	oggStakingAddress     = common.HexToAddress("0xCd442d7AC675D6c637a960e10913e341508C6672") // OGGStaking contract — 40%
+	oggTribePoolAddress   = common.HexToAddress("0xfeaD066Caa900F210B19B9df14aBc38B46a15e66") // OGGTribePool contract — 7%
+	oggMaintenanceAddress = common.HexToAddress("0x85ea896411EdFE9dD7fa6F4F5FaA19D2D81cdA5E") // Maintenance wallet — 8%
 )
 
-func accumulateRewards(_ *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
-	reward := new(big.Int).Set(progpowBlockReward)
-	r := new(big.Int)
-	for _, uncle := range uncles {
-		r.Add(uncle.Number, big8)
-		r.Sub(r, header.Number)
-		r.Mul(r, progpowBlockReward)
-		r.Div(r, big8)
-		state.AddBalance(uncle.Coinbase, r)
-		r.Div(progpowBlockReward, big32)
-		reward.Add(reward, r)
+// computeBlockReward calculates the OGG block reward at block number n.
+// Formula: reward(n) = initialReward * (decayNumerator / decayDenominator)^n
+// Uses binary exponentiation — O(log n), no floats.
+func computeBlockReward(blockNum *big.Int) *big.Int {
+	reward := new(big.Int).Set(oggInitialReward)
+	n := blockNum.Int64()
+
+	if n == 0 {
+		return reward
 	}
-	state.AddBalance(header.Coinbase, reward)
+
+	numPow := new(big.Int).SetInt64(1)
+	denPow := new(big.Int).SetInt64(1)
+	base := n
+
+	numBase := new(big.Int).Set(oggDecayNumerator)
+	denBase := new(big.Int).Set(oggDecayDenominator)
+
+	for base > 0 {
+		if base%2 == 1 {
+			numPow.Mul(numPow, numBase)
+			denPow.Mul(denPow, denBase)
+		}
+		numBase.Mul(numBase, numBase)
+		denBase.Mul(denBase, denBase)
+		base /= 2
+	}
+
+	reward.Mul(reward, numPow)
+	reward.Div(reward, denPow)
+	return reward
+}
+
+// accumulateRewardsOGG distributes the OGG block reward to four recipients.
+// Split: 45% miner, 40% staking, 7% tribe pool, 8% maintenance.
+// Miner receives remainder after three fixed splits — absorbs rounding dust.
+// No uncle rewards — OGG does not use uncle/ommer rewards.
+func accumulateRewardsOGG(_ *params.ChainConfig, state *state.StateDB, header *types.Header, uncles []*types.Header) {
+	totalReward := computeBlockReward(header.Number)
+
+	stakingReward := new(big.Int).Mul(totalReward, big.NewInt(40))
+	stakingReward.Div(stakingReward, big.NewInt(100))
+
+	tribeReward := new(big.Int).Mul(totalReward, big.NewInt(7))
+	tribeReward.Div(tribeReward, big.NewInt(100))
+
+	maintenanceReward := new(big.Int).Mul(totalReward, big.NewInt(8))
+	maintenanceReward.Div(maintenanceReward, big.NewInt(100))
+
+	// Miner gets the remainder — always equals 45% plus any rounding dust
+	minerReward := new(big.Int).Set(totalReward)
+	minerReward.Sub(minerReward, stakingReward)
+	minerReward.Sub(minerReward, tribeReward)
+	minerReward.Sub(minerReward, maintenanceReward)
+
+	state.AddBalance(header.Coinbase, minerReward)
+	state.AddBalance(oggStakingAddress, stakingReward)
+	state.AddBalance(oggTribePoolAddress, tribeReward)
+	state.AddBalance(oggMaintenanceAddress, maintenanceReward)
 }
 
 // ----------------------------------------------------------------------------
