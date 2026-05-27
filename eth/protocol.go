@@ -45,7 +45,7 @@ var ProtocolLengths = []uint64{17, 8}
 
 //const ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a protocol message
 const (
-	NetworkId          = 1987
+	NetworkId          = 70088
 	ProtocolMaxMsgSize = 10 * 1024 * 1024 // Maximum cap on the size of a protocol message
 )
 // eth protocol message codes
