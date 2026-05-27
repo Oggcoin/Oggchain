@@ -15,9 +15,9 @@ ProgPoW (Programmatic Proof of Work) is designed to close the efficiency gap ava
 - **Block time:** ~12 seconds
 - **Algorithm:** OggPoW (ProgPoW, custom Go implementation)
 - **ASIC resistant** — GPU focused from block one
-- **Network ID:** 19870
+- **Network ID:** 70088
 - **RPC Port:** 18545
-- **P2P Port:** 30666
+- **P2P Port:** 30303
 
 > 🪨 GPU miners built this chain. ASIC farms not welcome.
 
@@ -29,7 +29,7 @@ ProgPoW (Programmatic Proof of Work) is designed to close the efficiency gap ava
 
 | Allocation | Amount | % |
 |---|---|---|
-| ⛏️ Block Rewards (mined over 15 years) | 10,000,000,000 OGG | 93.5% |
+| ⛏️ Block Rewards (mined over 18 years) | 10,000,000,000 OGG | 93.5% |
 | 🪙 Premine | 700,000,000 OGG | 6.5% |
 
 **Block reward split — every block, forever:**
@@ -44,7 +44,7 @@ ProgPoW (Programmatic Proof of Work) is designed to close the efficiency gap ava
 Block rewards decay smoothly using exponential decay — no halvings, no sudden cliffs.
 
 ```
-Block Reward = 568.39 × 0.99999995157570044 ^ BlockNumber
+Block Reward = 700 × 0.999999933042 ^ BlockNumber
 ```
 
 ---
@@ -169,7 +169,7 @@ Create a `genesis.json` file:
 ```json
 {
   "config": {
-    "chainId": 19870,
+    "chainId": 70088,
     "homesteadBlock": 0,
     "eip155Block": 0,
     "eip158Block": 0
