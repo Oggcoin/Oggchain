@@ -207,8 +207,8 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
 	x := new(big.Int).SetUint64(time - parent.Time.Uint64())
 	x.Div(x, big.NewInt(10))
 	x.Sub(big.NewInt(1), x)
-	if x.Cmp(big.NewInt(-99)) < 0 {
-		x.SetInt64(-99)
+	if x.Cmp(big.NewInt(-512)) < 0 {
+		x.SetInt64(-512)
 	}
 	y := new(big.Int).Div(parent.Difficulty, params.DifficultyBoundDivisor)
 	diff := new(big.Int).Add(parent.Difficulty, new(big.Int).Mul(y, x))
