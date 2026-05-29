@@ -328,41 +328,52 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
 
 // Some weird constants to avoid constant memory allocs for them.
 var (
-	big1          = big.NewInt(1)
-	big2          = big.NewInt(2)
-	big3          = big.NewInt(3)
-	big7          = big.NewInt(7)
+	big1  = big.NewInt(1)
+	big2  = big.NewInt(2)
+	big3  = big.NewInt(3)
+	big7  = big.NewInt(7)
+	big12 = big.NewInt(12) // OGG: slower up-adjustment, reduces difficulty spikes
 )
 
-// EGEM Difficulty Algo
-// * +/- adjustment per block
-// including a randomizer
-//
+// oggEmergencyThreshold - emergency -50% only fires above this difficulty.
+var oggEmergencyThreshold = big.NewInt(1000001)
+
+// OGG Difficulty Algorithm (ethash path)
+// Target:    ~13s per block        (DurationLimit = 13)
+// Up:        +8.3% per fast block  - slow climb, prevents spikes
+// Down:      -33.3% per slow block - fast drop, quick recovery
+// Emergency: >5 min gap + diff above 1M threshold -> instant -50%
 
 func calcDifficultyEGEM(time uint64, parent *types.Header) *big.Int {
 	diff := new(big.Int)
-	adjustUp := new(big.Int).Div(parent.Difficulty, big7)
-	adjustDown := new(big.Int).Div(parent.Difficulty, big3)
 
-	bigTime := new(big.Int)
-	bigParentTime := new(big.Int)
+	bigTime := new(big.Int).SetUint64(time)
+	bigParentTime := new(big.Int).Set(parent.Time)
+	elapsed := new(big.Int).Sub(bigTime, bigParentTime)
 
-	bigTime.SetUint64(time)
-	bigParentTime.Set(parent.Time)
+	// Emergency: block gap > 5 minutes AND difficulty high enough
+	if elapsed.Cmp(big.NewInt(300)) > 0 &&
+		parent.Difficulty.Cmp(oggEmergencyThreshold) > 0 {
+		diff.Rsh(parent.Difficulty, 1)
+		if diff.Cmp(params.MinimumDifficulty) < 0 {
+			diff.Set(params.MinimumDifficulty)
+		}
+		return diff
+	}
 
-	if bigTime.Sub(bigTime, bigParentTime).Cmp(params.DurationLimit) < 0 {
-		diff.Add(parent.Difficulty, big7)
-		diff.Add(diff, adjustUp)
+	adjustUp   := new(big.Int).Div(parent.Difficulty, big12) // +8.3%
+	adjustDown := new(big.Int).Div(parent.Difficulty, big3)  // -33.3%
+
+	if elapsed.Cmp(params.DurationLimit) < 0 {
+		diff.Add(parent.Difficulty, adjustUp)
 	} else {
-		diff.Sub(parent.Difficulty, big3)
-		diff.Sub(diff, adjustDown)
+		diff.Sub(parent.Difficulty, adjustDown)
 	}
 
 	if diff.Cmp(params.MinimumDifficulty) < 0 {
 		diff.Set(params.MinimumDifficulty)
 	}
 
-	//fmt.Println("Next Block Difficulty: ", diff)
 	return diff
 }
 

@@ -199,19 +199,40 @@ func (p *ProgPoW) CalcDifficulty(chain consensus.ChainReader, time uint64, paren
 	return CalcDifficulty(chain.Config(), time, parent)
 }
 
-// CalcDifficulty is the ProgPoW difficulty adjustment (Homestead formula, same as Ethash).
-// Target block time: ~13 seconds.
+// OGG ProgPoW Difficulty Algorithm
+// Target:    ~13s per block
+// Up:        +8.3% per fast block  (< 13s) - slow climb, prevents spikes
+// Down:      -33.3% per slow block (>= 13s) - fast drop, quick recovery
+// Emergency: >5 min gap + diff above 1M threshold -> instant -50%
+//            Below threshold: normal -33% takes over, no death spiral
+
+var progpowEmergencyThreshold = big.NewInt(1000001)
+
 func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
-	// Homestead formula (EIP-2):
-	//   diff = parent_diff + parent_diff/2048 * max(1 - (block_time - parent_time)/10, -99)
-	x := new(big.Int).SetUint64(time - parent.Time.Uint64())
-	x.Div(x, big.NewInt(10))
-	x.Sub(big.NewInt(1), x)
-	if x.Cmp(big.NewInt(-512)) < 0 {
-		x.SetInt64(-512)
+	diff        := new(big.Int)
+	bigTime      := new(big.Int).SetUint64(time)
+	bigParentTime := new(big.Int).Set(parent.Time)
+	elapsed      := new(big.Int).Sub(bigTime, bigParentTime)
+
+	// Emergency: block gap > 5 minutes AND difficulty high enough
+	if elapsed.Cmp(big.NewInt(300)) > 0 &&
+		parent.Difficulty.Cmp(progpowEmergencyThreshold) > 0 {
+		diff.Rsh(parent.Difficulty, 1)
+		if diff.Cmp(params.MinimumDifficulty) < 0 {
+			diff.Set(params.MinimumDifficulty)
+		}
+		return diff
 	}
-	y := new(big.Int).Div(parent.Difficulty, params.DifficultyBoundDivisor)
-	diff := new(big.Int).Add(parent.Difficulty, new(big.Int).Mul(y, x))
+
+	adjustUp   := new(big.Int).Div(parent.Difficulty, big.NewInt(12)) // +8.3%
+	adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(3))  // -33.3%
+
+	if elapsed.Cmp(big.NewInt(13)) < 0 {
+		diff.Add(parent.Difficulty, adjustUp)
+	} else {
+		diff.Sub(parent.Difficulty, adjustDown)
+	}
+
 	if diff.Cmp(params.MinimumDifficulty) < 0 {
 		diff.Set(params.MinimumDifficulty)
 	}
