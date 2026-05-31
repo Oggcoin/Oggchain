@@ -95,11 +95,6 @@ func GetAPIs(apiBackend Backend) []rpc.API {
 			Service:   NewPublicTxPoolAPI(apiBackend),
 			Public:    true,
 		}, {
-			Namespace: "ogg",
-			Version:   "1.0",
-			Service:   NewPublicOGGAPI(apiBackend),
-			Public:    true,
-		}, {
 			Namespace: "debug",
 			Version:   "1.0",
 			Service:   NewPublicDebugAPI(apiBackend),
@@ -118,6 +113,11 @@ func GetAPIs(apiBackend Backend) []rpc.API {
 			Version:   "1.0",
 			Service:   NewPrivateAccountAPI(apiBackend, nonceLock),
 			Public:    false,
+		}, {
+			Namespace: "ogg",
+			Version:   "1.0",
+			Service:   NewPublicOGGAPI(apiBackend),
+			Public:    true,
 		},
 	}
 }

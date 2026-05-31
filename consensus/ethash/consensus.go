@@ -330,12 +330,13 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
 var (
 	big1  = big.NewInt(1)
 	big2  = big.NewInt(2)
-	big3  = big.NewInt(3)
+	big3  = big.NewInt(10)
 	big7  = big.NewInt(7)
-	big12 = big.NewInt(12) // OGG: slower up-adjustment, reduces difficulty spikes
+	big12 = big.NewInt(10) // OGG: faster up-adjustment for 13s target
 )
 
 // oggEmergencyThreshold - emergency -50% only fires above this difficulty.
+// Below it, normal -33% handles recovery. Prevents death spiral on repeated stalls.
 var oggEmergencyThreshold = big.NewInt(1000001)
 
 // OGG Difficulty Algorithm (ethash path)
@@ -343,18 +344,20 @@ var oggEmergencyThreshold = big.NewInt(1000001)
 // Up:        +8.3% per fast block  - slow climb, prevents spikes
 // Down:      -33.3% per slow block - fast drop, quick recovery
 // Emergency: >5 min gap + diff above 1M threshold -> instant -50%
+//            Below threshold: normal -33% takes over, no death spiral
 
 func calcDifficultyEGEM(time uint64, parent *types.Header) *big.Int {
 	diff := new(big.Int)
 
-	bigTime := new(big.Int).SetUint64(time)
-	bigParentTime := new(big.Int).Set(parent.Time)
-	elapsed := new(big.Int).Sub(bigTime, bigParentTime)
+	elapsed := new(big.Int).Sub(
+		new(big.Int).SetUint64(time),
+		new(big.Int).Set(parent.Time),
+	)
 
-	// Emergency: block gap > 5 minutes AND difficulty high enough
+	// Emergency: block gap > 5 minutes AND difficulty high enough to be worth halving
 	if elapsed.Cmp(big.NewInt(300)) > 0 &&
 		parent.Difficulty.Cmp(oggEmergencyThreshold) > 0 {
-		diff.Rsh(parent.Difficulty, 1)
+		diff.Rsh(parent.Difficulty, 1) // -50%
 		if diff.Cmp(params.MinimumDifficulty) < 0 {
 			diff.Set(params.MinimumDifficulty)
 		}

@@ -83,5 +83,5 @@ var (
 	DifficultyBoundDivisor = big.NewInt(2048)    // The bound divisor of the difficulty, used in the update calculations.
 	GenesisDifficulty      = big.NewInt(83886080) // OGG: 0x5000000 — good start for 1-5 GPUs, adjusts to 12s target quickly.
 	MinimumDifficulty      = big.NewInt(100000)  // OGG: never collapses below this — chain always keeps moving.
-	DurationLimit          = big.NewInt(13)      // OGG: ~13s block target
+	DurationLimit          = big.NewInt(13)      // OGG: ~13s block target (ethash path)
 )

@@ -209,34 +209,51 @@ func (p *ProgPoW) CalcDifficulty(chain consensus.ChainReader, time uint64, paren
 var progpowEmergencyThreshold = big.NewInt(1000001)
 
 func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
-	diff        := new(big.Int)
-	bigTime      := new(big.Int).SetUint64(time)
-	bigParentTime := new(big.Int).Set(parent.Time)
-	elapsed      := new(big.Int).Sub(bigTime, bigParentTime)
+    diff := new(big.Int)
+    elapsed := new(big.Int).SetUint64(time - parent.Time.Uint64())
 
-	// Emergency: block gap > 5 minutes AND difficulty high enough
-	if elapsed.Cmp(big.NewInt(300)) > 0 &&
-		parent.Difficulty.Cmp(progpowEmergencyThreshold) > 0 {
-		diff.Rsh(parent.Difficulty, 1)
-		if diff.Cmp(params.MinimumDifficulty) < 0 {
-			diff.Set(params.MinimumDifficulty)
-		}
-		return diff
-	}
+    // Emergency: block gap > 5 minutes AND difficulty high enough to be worth halving
+    // Hard fork block 116: new difficulty algorithm
+    if parent.Number.Uint64() < 115 {
+            // Pre-fork algo: +25% up, -12.5% down, emergency -50% at 5min
+            if elapsed.Cmp(big.NewInt(300)) > 0 &&
+                    parent.Difficulty.Cmp(progpowEmergencyThreshold) > 0 {
+                    diff.Rsh(parent.Difficulty, 1) // emergency -50%
+                    if diff.Cmp(params.MinimumDifficulty) < 0 {
+                            diff.Set(params.MinimumDifficulty)
+                    }
+                    return diff
+            }
+            adjustUp := new(big.Int).Div(parent.Difficulty, big.NewInt(4))   // +25%
+            adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(8)) // -12.5%
+            if elapsed.Cmp(big.NewInt(13)) < 0 {
+                    diff.Add(parent.Difficulty, adjustUp)
+            } else {
+                    diff.Sub(parent.Difficulty, adjustDown)
+            }
+    } else {
+            // Post-fork algo: +10% up, -10% down, emergency -25% at 3min
+            if elapsed.Cmp(big.NewInt(180)) > 0 &&
+                    parent.Difficulty.Cmp(progpowEmergencyThreshold) > 0 {
+                    diff.Set(new(big.Int).Sub(parent.Difficulty, new(big.Int).Div(parent.Difficulty, big.NewInt(4)))) // emergency -25%
+                    if diff.Cmp(params.MinimumDifficulty) < 0 {
+                            diff.Set(params.MinimumDifficulty)
+                    }
+                    return diff
+            }
+            adjustUp := new(big.Int).Div(parent.Difficulty, big.NewInt(10))   // +10%
+            adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(10)) // -10%
+            if elapsed.Cmp(big.NewInt(13)) < 0 {
+                    diff.Add(parent.Difficulty, adjustUp)
+            } else {
+                    diff.Sub(parent.Difficulty, adjustDown)
+            }
+    }
 
-	adjustUp   := new(big.Int).Div(parent.Difficulty, big.NewInt(12)) // +8.3%
-	adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(3))  // -33.3%
-
-	if elapsed.Cmp(big.NewInt(13)) < 0 {
-		diff.Add(parent.Difficulty, adjustUp)
-	} else {
-		diff.Sub(parent.Difficulty, adjustDown)
-	}
-
-	if diff.Cmp(params.MinimumDifficulty) < 0 {
-		diff.Set(params.MinimumDifficulty)
-	}
-	return diff
+    if diff.Cmp(params.MinimumDifficulty) < 0 {
+            diff.Set(params.MinimumDifficulty)
+    }
+    return diff
 }
 
 // Seal implements consensus.Engine — searches for a valid nonce.

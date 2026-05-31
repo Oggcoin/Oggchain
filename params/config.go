@@ -82,7 +82,7 @@ var (
 
 	// TestnetProgPoWChainConfig is a convenience preset for ProgPoW testnets.
 	TestnetProgPoWChainConfig = &ChainConfig{
-		ChainId:             big.NewInt(19870),
+		ChainId:             big.NewInt(70088),
 		HomesteadBlock:      big.NewInt(0),
 		DAOForkBlock:        nil,
 		DAOForkSupport:      false,
