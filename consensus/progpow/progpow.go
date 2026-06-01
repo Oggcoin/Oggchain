@@ -231,8 +231,8 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
             } else {
                     diff.Sub(parent.Difficulty, adjustDown)
             }
-    } else {
-            // Post-fork algo: +10% up, -10% down, emergency -25% at 3min
+    } else if parent.Number.Uint64() < 4100 {
+            // Era 2 (blocks 115-4099): +10% up, -10% down, target 13s, emergency -25% at 3min
             if elapsed.Cmp(big.NewInt(180)) > 0 &&
                     parent.Difficulty.Cmp(progpowEmergencyThreshold) > 0 {
                     diff.Set(new(big.Int).Sub(parent.Difficulty, new(big.Int).Div(parent.Difficulty, big.NewInt(4)))) // emergency -25%
@@ -244,6 +244,23 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
             adjustUp := new(big.Int).Div(parent.Difficulty, big.NewInt(10))   // +10%
             adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(10)) // -10%
             if elapsed.Cmp(big.NewInt(13)) < 0 {
+                    diff.Add(parent.Difficulty, adjustUp)
+            } else {
+                    diff.Sub(parent.Difficulty, adjustDown)
+            }
+    } else {
+            // Era 3 (blocks 4100+): +12.5% up, -14.3% down, target 12s, emergency -25% at 3min
+            if elapsed.Cmp(big.NewInt(180)) > 0 &&
+                    parent.Difficulty.Cmp(progpowEmergencyThreshold) > 0 {
+                    diff.Set(new(big.Int).Sub(parent.Difficulty, new(big.Int).Div(parent.Difficulty, big.NewInt(4)))) // emergency -25%
+                    if diff.Cmp(params.MinimumDifficulty) < 0 {
+                            diff.Set(params.MinimumDifficulty)
+                    }
+                    return diff
+            }
+            adjustUp := new(big.Int).Div(parent.Difficulty, big.NewInt(8))   // +12.5%
+            adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(7)) // -14.3%
+            if elapsed.Cmp(big.NewInt(12)) < 0 {
                     diff.Add(parent.Difficulty, adjustUp)
             } else {
                     diff.Sub(parent.Difficulty, adjustDown)

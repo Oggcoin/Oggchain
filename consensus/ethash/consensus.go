@@ -354,23 +354,57 @@ func calcDifficultyEGEM(time uint64, parent *types.Header) *big.Int {
 		new(big.Int).Set(parent.Time),
 	)
 
-	// Emergency: block gap > 5 minutes AND difficulty high enough to be worth halving
-	if elapsed.Cmp(big.NewInt(300)) > 0 &&
-		parent.Difficulty.Cmp(oggEmergencyThreshold) > 0 {
-		diff.Rsh(parent.Difficulty, 1) // -50%
-		if diff.Cmp(params.MinimumDifficulty) < 0 {
-			diff.Set(params.MinimumDifficulty)
+	if parent.Number.Uint64() >= 4100 {
+		// Era 3 (blocks 4100+): +12.5% up, -14.3% down, target 12s, emergency -25% at 3min
+		if elapsed.Cmp(big.NewInt(180)) > 0 &&
+			parent.Difficulty.Cmp(oggEmergencyThreshold) > 0 {
+			diff.Set(new(big.Int).Sub(parent.Difficulty, new(big.Int).Div(parent.Difficulty, big.NewInt(4)))) // emergency -25%
+			if diff.Cmp(params.MinimumDifficulty) < 0 {
+				diff.Set(params.MinimumDifficulty)
+			}
+			return diff
 		}
-		return diff
-	}
-
-	adjustUp   := new(big.Int).Div(parent.Difficulty, big12) // +8.3%
-	adjustDown := new(big.Int).Div(parent.Difficulty, big3)  // -33.3%
-
-	if elapsed.Cmp(params.DurationLimit) < 0 {
-		diff.Add(parent.Difficulty, adjustUp)
+		adjustUp   := new(big.Int).Div(parent.Difficulty, big.NewInt(8))  // +12.5%
+		adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(7))  // -14.3%
+		if elapsed.Cmp(big.NewInt(12)) < 0 {
+			diff.Add(parent.Difficulty, adjustUp)
+		} else {
+			diff.Sub(parent.Difficulty, adjustDown)
+		}
+	} else if parent.Number.Uint64() >= 115 {
+		// Era 2 (blocks 115-4099): +10% up, -10% down, target 13s, emergency -25% at 3min
+		if elapsed.Cmp(big.NewInt(180)) > 0 &&
+			parent.Difficulty.Cmp(oggEmergencyThreshold) > 0 {
+			diff.Set(new(big.Int).Sub(parent.Difficulty, new(big.Int).Div(parent.Difficulty, big.NewInt(4)))) // emergency -25%
+			if diff.Cmp(params.MinimumDifficulty) < 0 {
+				diff.Set(params.MinimumDifficulty)
+			}
+			return diff
+		}
+		adjustUp   := new(big.Int).Div(parent.Difficulty, big.NewInt(10)) // +10%
+		adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(10)) // -10%
+		if elapsed.Cmp(big.NewInt(13)) < 0 {
+			diff.Add(parent.Difficulty, adjustUp)
+		} else {
+			diff.Sub(parent.Difficulty, adjustDown)
+		}
 	} else {
-		diff.Sub(parent.Difficulty, adjustDown)
+		// Era 1 (blocks 0-114): original algo, emergency -50% at 5min
+		if elapsed.Cmp(big.NewInt(300)) > 0 &&
+			parent.Difficulty.Cmp(oggEmergencyThreshold) > 0 {
+			diff.Rsh(parent.Difficulty, 1) // -50%
+			if diff.Cmp(params.MinimumDifficulty) < 0 {
+				diff.Set(params.MinimumDifficulty)
+			}
+			return diff
+		}
+		adjustUp   := new(big.Int).Div(parent.Difficulty, big12) // +8.3%
+		adjustDown := new(big.Int).Div(parent.Difficulty, big3)  // -33.3%
+		if elapsed.Cmp(params.DurationLimit) < 0 {
+			diff.Add(parent.Difficulty, adjustUp)
+		} else {
+			diff.Sub(parent.Difficulty, adjustDown)
+		}
 	}
 
 	if diff.Cmp(params.MinimumDifficulty) < 0 {
