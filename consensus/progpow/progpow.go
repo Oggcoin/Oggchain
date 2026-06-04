@@ -248,8 +248,8 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
             } else {
                     diff.Sub(parent.Difficulty, adjustDown)
             }
-    } else {
-            // Era 3 (blocks 4100+): +12.5% up, -14.3% down, target 12s, emergency -25% at 3min
+    } else if parent.Number.Uint64() < 21000 {
+            // Era 3 (blocks 4100-20999): +12.5% up, -14.3% down, target 12s, emergency -25% at 3min
             if elapsed.Cmp(big.NewInt(180)) > 0 &&
                     parent.Difficulty.Cmp(progpowEmergencyThreshold) > 0 {
                     diff.Set(new(big.Int).Sub(parent.Difficulty, new(big.Int).Div(parent.Difficulty, big.NewInt(4)))) // emergency -25%
@@ -260,6 +260,23 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
             }
             adjustUp := new(big.Int).Div(parent.Difficulty, big.NewInt(8))   // +12.5%
             adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(7)) // -14.3%
+            if elapsed.Cmp(big.NewInt(12)) < 0 {
+                    diff.Add(parent.Difficulty, adjustUp)
+            } else {
+                    diff.Sub(parent.Difficulty, adjustDown)
+            }
+    } else {
+            // Era 4 (blocks 21000+): +12.5% up, -20% down, target 12s, emergency -25% at 3min
+            if elapsed.Cmp(big.NewInt(180)) > 0 &&
+                    parent.Difficulty.Cmp(progpowEmergencyThreshold) > 0 {
+                    diff.Set(new(big.Int).Sub(parent.Difficulty, new(big.Int).Div(parent.Difficulty, big.NewInt(4)))) // emergency -25%
+                    if diff.Cmp(params.MinimumDifficulty) < 0 {
+                            diff.Set(params.MinimumDifficulty)
+                    }
+                    return diff
+            }
+            adjustUp := new(big.Int).Div(parent.Difficulty, big.NewInt(8))   // +12.5%
+            adjustDown := new(big.Int).Div(parent.Difficulty, big.NewInt(5)) // -20%
             if elapsed.Cmp(big.NewInt(12)) < 0 {
                     diff.Add(parent.Difficulty, adjustUp)
             } else {
@@ -605,10 +622,24 @@ func accumulateRewardsOGG(_ *params.ChainConfig, state *state.StateDB, header *t
 	minerReward.Sub(minerReward, tribeReward)
 	minerReward.Sub(minerReward, maintenanceReward)
 
+	// Hardfork at block 21000: switch to new contract addresses
+	stakingAddr := oggStakingAddress
+	tribeAddr   := oggTribePoolAddress
+	if header.Number.Uint64() >= 21000 {
+		stakingAddr = common.HexToAddress("0xa47008c59f729756bEc7d01f6FE71328A242d0c4")
+		tribeAddr   = common.HexToAddress("0x085CF5da09842FA3BA01068CC02c156198b1b114")
+	}
+
 	state.AddBalance(header.Coinbase, minerReward)
-	state.AddBalance(oggStakingAddress, stakingReward)
-	state.AddBalance(oggTribePoolAddress, tribeReward)
+	state.AddBalance(stakingAddr, stakingReward)
+	state.AddBalance(tribeAddr, tribeReward)
 	state.AddBalance(oggMaintenanceAddress, maintenanceReward)
+
+	// One-time allocation at block 21001: seed new TribePool with 950,000 OGG
+	if header.Number.Uint64() == 21001 {
+		tribeSeed, _ := new(big.Int).SetString("950000000000000000000000", 10)
+		state.AddBalance(common.HexToAddress("0x085CF5da09842FA3BA01068CC02c156198b1b114"), tribeSeed)
+	}
 }
 
 // ----------------------------------------------------------------------------
